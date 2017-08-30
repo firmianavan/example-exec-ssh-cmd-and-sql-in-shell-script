@@ -1,0 +1,57 @@
+#!/bin/bash --login
+shopt -s expand_aliases
+
+rmbizjob="docker service ls | grep forkops-bizjob |grep -v grep |awk '{print \$1}'|xargs docker service rm"
+testcmd="docker service ls | awk '{print \$2}'"
+
+fcenv=$1
+job=$2
+customer=$3
+
+if [ $fcenv = pr ];then
+echo -n "you are operating on production environment! confirmed? (yes/no)"
+read confirm
+  if [ $confirm != yes ];then
+     echo "exit"
+     exit 0
+  fi
+fi
+fc-rc="ssh  user@host-rc"
+fc-pr="ssh  user@host-prod"
+execRC()
+{
+toshow=${1//"\$"/"\\\$"}
+$fc-rc -q "echo ------------------------------------;echo \"on \$(hostname) executing: $toshow\";echo ------------------------------------;$1;exit"
+}
+execPR()
+{
+toshow=${1//"\$"/"\\\$"}
+$fc-pr -q "echo ------------------------------------;echo \"on \$(hostname) executing: $toshow\";echo ------------------------------------;$1;exit"
+}
+execRemote()
+{
+if [ $1 = rc ];then
+  execRC "$2"
+elif [ $1 = pr ];then
+  execPR "$2"
+fi
+}
+
+if [ $job = list ];then
+echo available job:
+echo test: test this script
+echo billd: clear jobstatus,table bill detailed, table metric of job FetchAwsBillingDetailed
+elif [ $job = billd ];then
+  execRemote $fcenv "$rmbizjob"
+  execRemote $fcenv "sudo rm -rf /runtime/.data/cache/appendonly.aof"
+  execRemote $fcenv "docker service update --force \$(docker service ls -q -f name=devel-storage-cache)"
+  pg-exec $fcenv bizjob "DELETE from activity_status where activity_type='FetchAwsBillingDetailed'"
+  pg-exec $fcenv expenses "DROP TABLE aws_billing_detailed"
+  pg-exec $fcenv monitoring "delete from metric_statistics where namespace='FKO/Cost'"
+  execRemote $fcenv "docker service update --force \$(docker service ls -q -f name=devel-forkops-expenses)"
+elif [ $job = test ];then
+  execRemote rc "$testcmd"
+  execRemote pr "$testcmd"  
+fi
+#pg-exec rc bizjob ""
+#pg-exec rc bizjob ""

@@ -1,0 +1,21 @@
+#!/bin/bash
+module=$2
+scope=$1
+sql=$3
+if [ $scope = rc ]
+then
+    host=host-rc
+    user=user
+    port=5432
+elif [ $scope = pr ]; then
+    host=host-prod
+    user=user
+    port=5432
+fi
+
+cmd="psql -h $host -p $port -d $module  -U $user"
+echo "on $scope executing: $sql"
+$cmd << EOF
+$sql;
+\q
+EOF

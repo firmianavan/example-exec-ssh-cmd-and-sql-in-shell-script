@@ -1,0 +1,5 @@
+ServerAliveInterval 120
+Host host-rc
+	IdentityFile ~/.ssh/path/to/your-credential-rc.pem
+Host host-prod
+    IdentityFile ~/.ssh/path/to/your-credential-prod.pem
